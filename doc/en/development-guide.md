@@ -14,6 +14,8 @@ The package uses strict TypeScript, NodeNext module resolution, and declaration 
 
 The three files under `src/config` define supported attributes, metrics, workflow and agent events, A2A operations, and A2A-T extensions. Keep these files aligned with the Java and Python SDKs. When a public signal changes, update the applicable configuration version and both language API references and guides. Treat removing or tightening a published signal, attribute, required field, or metric dimension as a breaking change.
 
+A2A spans use the Java SDK operation names, including `SendMessage`, `SendStreamingMessage`, and the `GetTask` / push-notification methods. `GetExtendedAgentCard` and `SendPushNotification` are client-only; `SendStreamingMessage-negotiation` is server-only. Stream-event and stream-error spans retain their parent as a link.
+
 ## Exporters and context
 
 The SDK owns trace, metric, and log providers and does not replace the application's global tracer, meter, or logger providers. It installs the OpenTelemetry asynchronous context manager only when no context manager is already registered. Runtime exporter replacement retains in-flight requests and shuts down each retired exporter after those requests complete.

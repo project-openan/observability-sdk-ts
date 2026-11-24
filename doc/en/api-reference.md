@@ -35,6 +35,10 @@ Supported environment variables are `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTE
 
 `observe.log(name, severity, body, attributes?, { span?, context? }?)` emits a structured log. The severity can be one of `LogSeverity.TRACE`, `DEBUG`, `INFO`, `WARN`, `ERROR`, or `FATAL`. Pass at most one span or explicit OpenTelemetry context.
 
+`observe.logRecord(severity, body, attributes?, { eventName?, timestamp?, exception?, context? }?)` emits a general OpenTelemetry log without a configured signal schema. The timestamp is a JavaScript `Date`; attributes may contain strings, booleans, finite numbers, or string arrays. String values and the exception message are sanitized before export.
+
+A2A trace names use JSON-RPC method names such as `SendMessage`, `SendStreamingMessage`, `GetTask`, `CancelTask`, `ListTasks`, and push-notification configuration methods. `GetExtendedAgentCard` and `SendPushNotification` are client-only; `SendStreamingMessage-negotiation` is server-only. Stream events may include task status and artifact attributes, and message spans may include transport, protocol version, model, and token usage.
+
 Signal names, attribute types, requirements, and metric dimensions come from the bundled YAML files in `src/config`. String values are redacted for common credentials and URL query/user information before export.
 
 ## Trace context propagation

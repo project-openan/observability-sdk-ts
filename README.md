@@ -34,7 +34,7 @@ const sdk = ObservabilitySdk.start({
 const observe = sdk.observe();
 const task = { "extension.name": "task-t", "task.type": "diagnosis" };
 
-const span = observe.trace("message/send", SignalKind.CLIENT, task);
+const span = observe.trace("SendMessage", SignalKind.CLIENT, task);
 await span.makeCurrent(async () =&gt; {
   observe.log("gen_ai.agent.a2at.message", LogSeverity.INFO, "diagnosis completed", task, { span });
   observe.metric("task.duration", 42_000, { "task.type": "diagnosis" });
@@ -86,12 +86,12 @@ const sdk = ObservabilitySdk.start();
 const observe = sdk.observe();
 const headers: Record&lt;string, string&gt; = {};
 
-const client = observe.trace("message/send", SignalKind.CLIENT, { "operation.name": "message/send" });
+const client = observe.trace("SendMessage", SignalKind.CLIENT, { "operation.name": "SendMessage" });
 await client.makeCurrent(() =&gt; TraceContextPropagation.inject(headers));
 client.end();
 
 await TraceContextPropagation.runWithExtracted(headers, async () =&gt; {
-  const server = observe.trace("message/send", SignalKind.SERVER, { "operation.name": "message/send" });
+  const server = observe.trace("SendMessage", SignalKind.SERVER, { "operation.name": "SendMessage" });
   server.ok();
   server.end();
 });

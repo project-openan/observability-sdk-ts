@@ -6,15 +6,28 @@ attributes:
   task_id: {otel_name: gen_ai.agent.a2a.task_id, type: string, signals: S}
   context_id: {otel_name: gen_ai.agent.a2a.context_id, type: string, signals: S}
   message_id: {otel_name: gen_ai.agent.a2a.message_id, type: string, signals: S}
-  Role: {otel_name: gen_ai.agent.a2a.Role, type: string, signals: S}
-  Extensions: {otel_name: gen_ai.agent.a2a.Extensions, type: string, signals: S}
+  role: {otel_name: gen_ai.agent.a2a.role, type: string, signals: S}
+  extensions: {otel_name: gen_ai.agent.a2a.extensions, type: string, signals: S}
   parts.number: {otel_name: gen_ai.agent.a2a.parts.number, type: integer, signals: S}
   config_id: {otel_name: gen_ai.agent.a2a.config_id, type: string, signals: S}
-  Request: {otel_name: gen_ai.agent.a2a.Request, type: string, signals: S}
-  Response: {otel_name: gen_ai.agent.a2a.Response, type: string, signals: S}
+  request: {otel_name: gen_ai.agent.a2a.request, type: string, signals: S}
+  response: {otel_name: gen_ai.agent.a2a.response, type: string, signals: S}
   streaming-event: {otel_name: gen_ai.agent.a2a.streaming-event, type: string, signals: S}
   error.type: {otel_name: error.type, type: string, signals: SM}
   gen_ai.system: {otel_name: gen_ai.system, type: string, signals: M}
+  gen_ai.provider.name: {otel_name: gen_ai.provider.name, type: string, signals: S}
+  gen_ai.operation.name: {otel_name: gen_ai.operation.name, type: string, signals: S}
+  gen_ai.agent.id: {otel_name: gen_ai.agent.id, type: string, signals: S}
+  gen_ai.agent.version: {otel_name: gen_ai.agent.version, type: string, signals: S}
+  push_notification.event_kind: {otel_name: gen_ai.agent.a2a.push_notification.event_kind, type: string, signals: S}
+  transport: {otel_name: gen_ai.agent.a2a.transport, type: string, signals: S}
+  protocol.version: {otel_name: gen_ai.agent.a2a.protocol.version, type: string, signals: S}
+  task.status.state: {otel_name: gen_ai.agent.a2a.task.status.state, type: string, signals: S}
+  usage.input_tokens: {otel_name: gen_ai.usage.input_tokens, type: integer, signals: S}
+  usage.output_tokens: {otel_name: gen_ai.usage.output_tokens, type: integer, signals: S}
+  artifact.name: {otel_name: a2a.artifact.name, type: string, signals: S}
+  artifact.append: {otel_name: a2a.artifact.append, type: boolean, signals: S}
+  artifact.last_chunk: {otel_name: a2a.artifact.last_chunk, type: boolean, signals: S}
   extension.name: {otel_name: gen_ai.agent.a2at.extension.name, type: string, values: [task-t, negotiation-t, notification-t, authorization-t]}
   task.type: {otel_name: gen_ai.agent.a2at.task.type, type: string}
   task.object: {otel_name: gen_ai.agent.a2at.task.object, type: string}
@@ -32,30 +45,38 @@ attributes:
 a2a:
   attribute_prefix: gen_ai.agent.a2a.
   special_traces:
-    message: message/send
-    stream: message/stream
-    stream_event: message/stream-event
-    stream_error: message/stream-error
+    message: SendMessage
+    stream: SendStreamingMessage
+    stream_event: SendStreamingMessage-event
+    stream_error: SendStreamingMessage-end
+    stream_negotiation: SendStreamingMessage-negotiation
   trace_names:
-    - message/send
-    - message/stream
-    - message/stream-event
-    - message/stream-error
-    - tasks/get
-    - tasks/cancel
-    - tasks/list
-    - tasks/resubscribe
-    - tasks/pushNotificationConfig/set
-    - tasks/pushNotificationConfig/get
-    - tasks/pushNotificationConfig/list
-    - tasks/pushNotificationConfig/delete
-  client_only_traces: [message/stream-event, message/stream-error]
+    - SendMessage
+    - SendStreamingMessage
+    - SendStreamingMessage-event
+    - SendStreamingMessage-end
+    - SendStreamingMessage-negotiation
+    - GetTask
+    - CancelTask
+    - ListTasks
+    - SubscribeToTask
+    - CreateTaskPushNotificationConfig
+    - GetTaskPushNotificationConfig
+    - ListTaskPushNotificationConfigs
+    - DeleteTaskPushNotificationConfig
+    - GetExtendedAgentCard
+    - SendPushNotification
+  client_only_traces: [GetExtendedAgentCard, SendPushNotification]
+  server_only_traces: [SendStreamingMessage-negotiation]
   span_attributes:
-    allowed: [operation.name, task_id, context_id, message_id, Role, Extensions, parts.number, config_id, Request, Response, error.type]
+    allowed: [operation.name, task_id, context_id, message_id, role, extensions, parts.number, config_id, request, response, error.type, gen_ai.provider.name, gen_ai.operation.name, gen_ai.agent.name, gen_ai.agent.id, gen_ai.agent.version, push_notification.event_kind, transport, protocol.version, gen_ai.response.model, usage.input_tokens, usage.output_tokens]
     required: []
   stream_event_attributes:
-    allowed: [operation.name, task_id, context_id, message_id, Role, Extensions, parts.number, config_id, Request, Response, error.type, streaming-event]
+    allowed: [operation.name, task_id, context_id, message_id, role, extensions, parts.number, config_id, request, response, error.type, streaming-event, gen_ai.provider.name, gen_ai.operation.name, gen_ai.agent.name, gen_ai.agent.id, gen_ai.agent.version, task.status.state, artifact.name, artifact.append, artifact.last_chunk, gen_ai.response.model, usage.input_tokens, usage.output_tokens]
     required: []
+  stream_negotiation_attributes:
+    allowed: [extension.name, negotiation.id, negotiation.round, negotiation.total_rounds, negotiation.max_rounds, negotiation.result, negotiation.performative]
+    required: [extension.name]
 
 metrics:
   gen_ai.client.operation.duration:

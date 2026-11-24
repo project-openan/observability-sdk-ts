@@ -1,10 +1,29 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 import { readFileSync } from "node:fs";
 import { parse } from "yaml";
 
 export interface AttributeDefinition {
   readonly name: string;
   readonly signals: string;
-  readonly valueType: "string" | "integer" | "string_array";
+  readonly valueType: "string" | "integer" | "boolean" | "string_array";
   readonly values: ReadonlySet<string>;
 }
 
@@ -36,10 +55,13 @@ export interface A2aProtocolDefinition {
   readonly stream: string;
   readonly streamEvent: string;
   readonly streamError: string;
+  readonly streamNegotiation: string;
   readonly traceNames: ReadonlySet<string>;
   readonly clientOnlyTraces: ReadonlySet<string>;
+  readonly serverOnlyTraces: ReadonlySet<string>;
   readonly span: SignalDefinition;
   readonly streamEventSpan: SignalDefinition;
+  readonly streamNegotiationSpan: SignalDefinition;
 }
 
 export interface SignalCatalog {
@@ -82,7 +104,7 @@ export function loadCatalog(): SignalCatalog {
     for (const [key, raw] of Object.entries(mapping(root.attributes ?? {}, `${filename}.attributes`))) {
       const item = mapping(raw, `${filename}.attributes.${key}`);
       const valueType = stringValue(item.type, `${filename}.attributes.${key}.type`).toLowerCase() as AttributeDefinition["valueType"];
-      if (!["string", "integer", "string_array"].includes(valueType)) throw new Error(`Unsupported attribute type at ${filename}.attributes.${key}`);
+      if (!["string", "integer", "boolean", "string_array"].includes(valueType)) throw new Error(`Unsupported attribute type at ${filename}.attributes.${key}`);
       const values = new Set(stringList(item.values ?? [], `${filename}.attributes.${key}.values`));
       if (values.size > 0 && key !== "extension.name") throw new Error(`Only extension.name may declare values at ${filename}.attributes.${key}`);
       const signals = item.signals ?? "SML";
@@ -138,9 +160,13 @@ export function loadCatalog(): SignalCatalog {
       const stream = stringValue(special.stream, `${filename}.a2a.special_traces.stream`);
       const streamEvent = stringValue(special.stream_event, `${filename}.a2a.special_traces.stream_event`);
       const streamError = stringValue(special.stream_error, `${filename}.a2a.special_traces.stream_error`);
+      const streamNegotiation = stringValue(special.stream_negotiation, `${filename}.a2a.special_traces.stream_negotiation`);
       const traceNames = new Set(stringList(protocol.trace_names, `${filename}.a2a.trace_names`));
       const clientOnlyTraces = new Set(stringList(protocol.client_only_traces, `${filename}.a2a.client_only_traces`));
-      if (![message, stream, streamEvent, streamError].every((name) => traceNames.has(name)) || [...clientOnlyTraces].some((name) => !traceNames.has(name))) {
+      const serverOnlyTraces = new Set(stringList(protocol.server_only_traces ?? [], `${filename}.a2a.server_only_traces`));
+      if (![message, stream, streamEvent, streamError, streamNegotiation].every((name) => traceNames.has(name))
+        || [...clientOnlyTraces].some((name) => !traceNames.has(name))
+        || [...serverOnlyTraces].some((name) => !traceNames.has(name) || clientOnlyTraces.has(name))) {
         throw new Error(`A2A special traces must be listed at ${filename}.a2a`);
       }
       a2a = Object.freeze({
@@ -149,10 +175,13 @@ export function loadCatalog(): SignalCatalog {
         stream,
         streamEvent,
         streamError,
+        streamNegotiation,
         traceNames,
         clientOnlyTraces,
+        serverOnlyTraces,
         span: signal(protocol.span_attributes, `${filename}.a2a.span_attributes`),
         streamEventSpan: signal(protocol.stream_event_attributes, `${filename}.a2a.stream_event_attributes`),
+        streamNegotiationSpan: signal(protocol.stream_negotiation_attributes, `${filename}.a2a.stream_negotiation_attributes`, "negotiation-t"),
       });
     }
   }

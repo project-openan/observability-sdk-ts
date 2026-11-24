@@ -1,3 +1,22 @@
+/*
+ * Copyright (c) 2026 Huawei Technologies Co., Ltd.
+ * All Rights Reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ *    Licensed under the Apache License, Version 2.0 (the License); you may
+ *    not use this file except in compliance with the License. You may obtain
+ *    a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an AS IS BASIS, WITHOUT
+ *    WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ *    License for the specific language governing permissions and limitations
+ *    under the License.
+ */
+
 import {
   context,
   ROOT_CONTEXT,
@@ -10,7 +29,7 @@ import {
   type Tracer,
 } from "@opentelemetry/api";
 import type { AttributeValue, SpanAttributes } from "@opentelemetry/api";
-import { clean, metricShortName, selectExtension, validateAttributes } from "./_attributes.js";
+import { clean, convertGeneralLogAttributes, metricShortName, selectExtension, validateAttributes } from "./_attributes.js";
 import { SIGNAL_CATALOG, type MetricDefinition, type SignalCatalog, type SignalDefinition } from "./definitions.js";
 import { LogSeverity, SignalKind } from "./enums.js";
 import { ObservationSpan } from "./span.js";
@@ -50,13 +69,22 @@ export class Observability {
       if (parent !== undefined && !(parent instanceof ObservationSpan)) throw new TypeError("parent must be an ObservationSpan");
       const spanKind = spanKindFrom(kind);
       const isA2a = this.catalog.a2a.traceNames.has(name);
-      const isStreamEvent = name === this.catalog.a2a.streamEvent;
+      const isStreamEvent = name === this.catalog.a2a.streamEvent || name === this.catalog.a2a.streamError;
       let definition: SignalDefinition | undefined;
       if (isA2a) {
         if (spanKind !== SpanKind.CLIENT && spanKind !== SpanKind.SERVER) throw new TypeError("A2A spans require CLIENT or SERVER kind");
         if (this.catalog.a2a.clientOnlyTraces.has(name) && spanKind !== SpanKind.CLIENT) throw new TypeError("A2A trace is client-only");
+        if (this.catalog.a2a.serverOnlyTraces.has(name) && spanKind !== SpanKind.SERVER) throw new TypeError("A2A trace is server-only");
         const extension = selectExtension(attributes, this.catalog.spans, this.catalog);
-        if (extension) {
+        if (name === this.catalog.a2a.streamNegotiation) {
+          definition = {
+            ...(this.catalog.a2a.streamNegotiationSpan.extension
+              ? { extension: this.catalog.a2a.streamNegotiationSpan.extension }
+              : {}),
+            allowed: new Set([...this.catalog.a2a.span.allowed, ...this.catalog.a2a.streamNegotiationSpan.allowed]),
+            required: this.catalog.a2a.streamNegotiationSpan.required,
+          };
+        } else if (extension) {
           if (name !== this.catalog.a2a.message && name !== this.catalog.a2a.stream) throw new TypeError("A2A extension attributes are only supported on message traces");
           definition = {
             ...(extension.extension ? { extension: extension.extension } : {}),
@@ -64,7 +92,7 @@ export class Observability {
             required: extension.required,
           };
         } else {
-          definition = isStreamEvent ? this.catalog.a2a.streamEventSpan : this.catalog.a2a.span;
+          definition = name === this.catalog.a2a.streamEvent ? this.catalog.a2a.streamEventSpan : this.catalog.a2a.span;
         }
       } else {
         if (spanKind !== SpanKind.INTERNAL) throw new TypeError("Workflow and agent spans require INTERNAL kind");
@@ -106,7 +134,7 @@ export class Observability {
       }
       if ([...definition.required].some((key) => !supplied.has(key))) throw new TypeError("required metric dimension is missing");
       const metricAttributes = { ...converted } as Record<string, AttributeValue>;
-      if (definition.a2a) metricAttributes["gen_ai.system"] = "A2A";
+      if (definition.a2a) metricAttributes["gen_ai.system"] = "a2a";
       if (definition.histogram) this.histograms.get(definition.name)?.record(value, metricAttributes);
       else this.counters.get(definition.name)?.add(value, metricAttributes);
     } catch {
@@ -148,6 +176,42 @@ export class Observability {
       });
     } catch {
       DIAGNOSTICS.warn("Observation log rejected");
+    }
+  }
+
+  logRecord(
+    severity: LogSeverity | `${LogSeverity}` | string,
+    body: string,
+    attributes: Readonly<Record<string, unknown>> = {},
+    options: { eventName?: string; timestamp?: Date; exception?: Error; context?: Context } = {},
+  ): void {
+    if (!this.enabled()) return;
+    try {
+      if (typeof body !== "string") throw new TypeError("log body is required");
+      if (options.eventName !== undefined && typeof options.eventName !== "string") throw new TypeError("event name must be a string");
+      if (options.timestamp !== undefined && (!(options.timestamp instanceof Date) || Number.isNaN(options.timestamp.valueOf()))) {
+        throw new TypeError("timestamp must be a valid Date");
+      }
+      if (options.exception !== undefined && !(options.exception instanceof Error)) throw new TypeError("exception must be an Error");
+      const normalizedSeverity = String(severity).toUpperCase() as LogSeverity;
+      const severityNumber = SEVERITY_NUMBERS[normalizedSeverity];
+      if (severityNumber === undefined) throw new TypeError("unsupported log severity");
+      const converted = convertGeneralLogAttributes(attributes) as Record<string, AttributeValue>;
+      if (options.exception) {
+        converted["exception.type"] = options.exception.constructor.name;
+        converted["exception.message"] = clean(options.exception.toString());
+      }
+      this.logger.emit({
+        ...(options.eventName?.trim() ? { eventName: clean(options.eventName) } : {}),
+        ...(options.timestamp ? { timestamp: options.timestamp } : {}),
+        severityNumber,
+        severityText: normalizedSeverity,
+        body: clean(body),
+        attributes: converted,
+        context: options.context ?? context.active(),
+      });
+    } catch {
+      DIAGNOSTICS.warn("Observation general log rejected");
     }
   }
 

@@ -35,6 +35,10 @@
 
 `observe.log(name, severity, body, attributes?, { span?, context? }?)` 发送结构化 Log。Severity 可选 `LogSeverity.TRACE`、`DEBUG`、`INFO`、`WARN`、`ERROR` 或 `FATAL`。Span 与显式 OpenTelemetry Context 最多传入一个。
 
+`observe.logRecord(severity, body, attributes?, { eventName?, timestamp?, exception?, context? }?)` 发送不使用预定义信号 Schema 的通用 OpenTelemetry Log。时间戳使用 JavaScript `Date`；属性支持字符串、布尔值、有限数值和字符串数组。导出前会清理字符串属性和异常信息。
+
+A2A Trace 名称使用 JSON-RPC 方法名，例如 `SendMessage`、`SendStreamingMessage`、`GetTask`、`CancelTask`、`ListTasks` 和推送通知配置方法。`GetExtendedAgentCard` 与 `SendPushNotification` 仅支持 Client；`SendStreamingMessage-negotiation` 仅支持 Server。流事件可记录任务状态和 Artifact 属性，消息 Span 可记录传输方式、协议版本、模型及 Token 用量。
+
 支持的信号名称、属性类型、必填字段和 Metric 维度由 `src/config` 中的 YAML 文件定义。导出前会对常见凭据和 URL 查询信息进行脱敏。
 
 ## Trace 上下文传播
